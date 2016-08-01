@@ -1,0 +1,40 @@
+---
+- hosts: all
+  sudo : yes
+  vars:
+    host: $inventory_hostname
+
+  tasks:
+    - name : 필수 패키지 설치 확인
+      apt: pkg:nginx, git, python3, python3-pip state=present
+    - name : nginx에서 긴 호스트명 허용
+      lineinfile:
+        dest=/etc/nginx/nginx.conf
+        regexp='(\s+)#? ?server_names_hash_bucket_size'
+        backrefs=yes
+        line='\1server_names_hash_bucket_size 64'
+    - name : nginx 설정을 sites-available에 추가
+      template: src=./nginx.conf.j2 dest dest=/etc/nginx/sites-available/{{ host }}
+      notify :
+        - restart nginx
+
+    - name : nginx sites-enabled에 링크 추가
+      file : src=/etc/nginx/sites-available/{{ host }}
+              dest=/etc/nginx/sites-enabled/{{ host }} state=link
+      notify :
+        - restart nginx
+
+    - name : gunicorn 초기화 스크립트
+      template: src=./gunicorn-upstart.conf.j2 dest=/etc/init/gunicorn-{{ host }}.conf
+      notify:
+        - restart gunicorn
+      - name : nginx가 실행되는지 확인
+        service: name=nginx state=running
+      - name : gunicorn 가동 확인
+        service : name=gunicorn-{{ host }} state=running
+
+        handlers:
+          -name : nginx 재시작
+            service : name=nginx state=restarted
+          -name : gunicorn 재시작
+            service : name=gunicorn-{{ host }} state=restarted

@@ -1,0 +1,9 @@
+description "Gunicorn server for {{ host }}"
+
+start on net-device-up
+start on shutdown
+
+respawn
+
+chdir /home/harry/sites/{{ host }}/source
+exec ../virtualenv/bin/gunicorn --bind unix:/tmp/{{ host }}.socket --access-logfile ../access.log --error-logfile ../error.log superlists.wsgi:application
